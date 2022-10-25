@@ -1,88 +1,73 @@
 package controllers
 
 import (
-	"encoding/json"
-	"fmt"
-	"net/http"
-	"strconv"
+	"time"
 
+	"github.com/COOPSPROFI/GoLangProject/pkg/configs"
 	"github.com/COOPSPROFI/GoLangProject/pkg/models"
-	"github.com/COOPSPROFI/GoLangProject/pkg/utils"
-	"github.com/gorilla/mux"
+	"github.com/gin-gonic/gin"
 )
 
-var NewEvent models.Event
-
-func GetEvents(w http.ResponseWriter, r *http.Request) {
-	newEvents := models.GetEvents()
-	res, _ := json.Marshal(newEvents)
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(res)
+func GetAllEvents(c *gin.Context) {
+	var event models.Event
+	configs.DB.Find(&event)
+	c.JSON(200, gin.H{
+		"all events in database": event,
+	})
 }
 
-func GetEventById(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	eventID := vars["eventID"]
-	ID, err := strconv.ParseInt(eventID, 0, 0)
-	if err != nil {
-		fmt.Println("error while parsing")
+func CreateEvent(c *gin.Context) {
+	var request struct {
+		Name        string
+		Description string
+		Img         string
+		Date        time.Time
 	}
-	eventDetails, _ := models.GetEventById(ID)
-	res, _ := json.Marshal(eventDetails)
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(res)
+	c.Bind(&request)
+
+	event := models.Event{Name: request.Name, Description: request.Description, Img: request.Img, Date: request.Date}
+
+	result := configs.DB.Create(&event)
+	if result.Error != nil {
+		c.Status(400)
+		return
+	}
+	c.JSON(200, gin.H{
+		"created event": event,
+	})
 }
 
-func CreateEvent(w http.ResponseWriter, r *http.Request) {
-	CreateEvent := &models.Event{}
-	utils.ParseBody(r, CreateEvent)
-	e := CreateEvent.CreateEvent()
-	res, _ := json.Marshal(e)
-	w.WriteHeader(http.StatusOK)
-	w.Write(res)
+func GetEventById(c *gin.Context) {
+	id := c.Param("id")
+	var event models.Event
+	configs.DB.First(&event, id)
+	c.JSON(200, gin.H{
+		"get event by id in database": event,
+	})
 }
 
-func DeleteEvent(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	eventID := vars["eventID"]
-	ID, err := strconv.ParseInt(eventID, 0, 0)
-	if err != nil {
-		fmt.Println("error while parsing")
+func UpdateEvent(c *gin.Context) {
+	id := c.Param("id")
+	var request struct {
+		Name        string
+		Description string
+		Img         string
+		Date        time.Time
 	}
-	event := models.DeleteEvent(ID)
-	res, _ := json.Marshal(event)
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(res)
+	c.Bind(&request)
+	var event models.Event
+	configs.DB.First(&event, id)
+
+	configs.DB.Model(&event).Updates(models.Event{
+		Name: request.Name, Description: request.Description, Img: request.Img, Date: request.Date,
+	})
+	c.JSON(200, gin.H{
+		"updated event": event,
+	})
 }
 
-func UpdateEvent(w http.ResponseWriter, r *http.Request) {
-	var updateEvent = &models.Event{}
-	utils.ParseBody(r, updateEvent)
-	vars := mux.Vars(r)
-	eventID := vars["eventID"]
-	ID, err := strconv.ParseInt(eventID, 0, 0)
-	if err != nil {
-		fmt.Println("error while parsing")
-	}
-	eventDetails, db := models.GetEventById(ID)
-	if updateEvent.Name != "" {
-		eventDetails.Name = updateEvent.Name
-	}
-	if updateEvent.Description != "" {
-		eventDetails.Description = updateEvent.Description
-	}
-	if updateEvent.Img != "" {
-		eventDetails.Img = updateEvent.Img
-	}
-	// if updateEvent.Date != time.Date() {
-	// 	eventDetails.Date = updateEvent.Date
-	// }
-	db.Save(&eventDetails)
-	res, _ := json.Marshal(eventDetails)
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(res)
+func DeleteEvent(c *gin.Context) {
+	id := c.Param("id")
+	configs.DB.Delete(&models.Event{}, id)
+	c.Status(200)
 }
